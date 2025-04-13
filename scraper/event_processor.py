@@ -14,7 +14,7 @@ def process_event(driver, event_item, queue):
         time.sleep(PAGE_LOAD_DELAY)
         
         new_url = driver.current_url
-        if new_url != parent:
+        if new_url != parent and "ajou.ac.kr/" in new_url:
             queue.appendleft({"type": "link", "url": new_url, "parent": parent})
         
         try:

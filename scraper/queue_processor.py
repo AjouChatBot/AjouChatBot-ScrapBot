@@ -1,4 +1,5 @@
 # scraper/queue_processor.py
+import requests
 from collections import deque
 from scraper.page_processor import process_page
 from scraper.event_processor import process_event
@@ -7,12 +8,19 @@ from utils.config import FILE_EXTENSIONS, VISIT_JSON, FILELIST_JSON
 
 def is_file_download(url):
     """
-    URL의 확장자를 기준으로 파일 다운로드 대상인지 판단합니다.
+    URL응답에 따라 파일응답인지 여부를 판단합니다
     """
-    for ext in FILE_EXTENSIONS:
-        if url.lower().endswith(ext):
+    try:
+        response = requests.head(url, allow_redirects=True, timeout=5)
+        content_type = response.headers.get("Content-Type", "").lower()
+
+        # HTML이 아닌 경우 = 파일 응답으로 간주
+        if not content_type.startswith("text/html") and not content_type.startswith("application/xhtml+xml"):
             return True
-    return False
+        return False
+    except requests.RequestException as e:
+        print(f"[에러] 요청 실패: {e}")
+        return False    
 
 def process_queue(driver, start_url):
     """
@@ -35,6 +43,7 @@ def process_queue(driver, start_url):
                 del queue[idx]
                 process_event(driver, event_item, queue)
                 break
+
         if event_found:
             continue
         
@@ -43,6 +52,7 @@ def process_queue(driver, start_url):
         if item["type"] == "link":
             url = item["url"]
             parent = item.get("parent")
+
             if is_file_download(url):
                 filelist = process_file_download(url, parent, filelist)
             else:
