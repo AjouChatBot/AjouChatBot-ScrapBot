@@ -1,8 +1,10 @@
 # utils/file_manager.py
 import os
 import json
+import re
 import requests
 from utils.config import FILES_DIR, FILELIST_JSON, VISIT_JSON
+from utils.db_manager import save_content
 
 def initialize_files():
     """
@@ -16,7 +18,7 @@ def initialize_files():
             with open(filename, 'w', encoding='utf-8') as f:
                 json.dump({}, f, ensure_ascii=False, indent=4)
 
-def load_json(filename):
+def load_json(filename):    
     with open(filename, 'r', encoding='utf-8') as f:
         return json.load(f)
 
@@ -32,16 +34,35 @@ def process_file_download(url, parent, filelist):
         return filelist
     try:
         r = requests.get(url, stream=True)
+        content_disposition = r.headers.get("Content-Disposition", "")
+
         if r.status_code == 200:
-            local_filename = url.split("/")[-1]
-            filepath = os.path.join(FILES_DIR, local_filename)
+
+            org_filename = None
+            if "filename=" in content_disposition:
+                filename_match = re.search(r'filename="?([^\";]+)"?', content_disposition)
+                if filename_match:
+                    org_filename = filename_match.group(1)
+            
+            if not org_filename:
+                org_filename = os.path.basename(url.split("?")[0])
+            
+            org_filename, org_ext = os.path.splitext(org_filename)
+            org_ext = org_ext.lstrip(".")
+
+            content_id = save_content("", org_filename, org_ext)
+            filepath = os.path.join(FILES_DIR, content_id)
+
             with open(filepath, 'wb') as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
-            filelist[url] = {"parent": parent, "filename": local_filename}
+
+            
+            filelist[url] = {"parent": parent, "filename": content_id}
+
             save_json(FILELIST_JSON, filelist)
-            print(f"파일 다운로드 완료: {local_filename} (출처: {url})")
+            print(f"파일 다운로드 완료: {content_id} (출처: {url})")
     except Exception as e:
         print(f"파일 다운로드 중 오류 발생 (URL: {url}): {e}")
     return filelist
