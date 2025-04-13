@@ -3,3 +3,7 @@ venv/
 
 # Environment Variable
 .env*
+
+files/*
+filelist.json
+visit.json

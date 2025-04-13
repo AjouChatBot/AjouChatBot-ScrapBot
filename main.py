@@ -1,4 +1,3 @@
-# main.py
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from utils.config import CHROME_HEADLESS_OPTIONS, START_URL
