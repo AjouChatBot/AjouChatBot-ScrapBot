@@ -2,19 +2,22 @@
 # 프로젝트 설정 값을 정의합니다.
 
 import os
-
 from dotenv import load_dotenv
 
 # 시작 URL (필요에 따라 변경)
 # START_URL = "https://ajou.ac.kr/kr/guide/sitemap.do"
-START_URL = "https://ajou.ac.kr/dorm/index.do"
+# START_URL = "https://www.ajou.ac.kr/researcher"
+# START_URL = "https://ajou.ac.kr/dorm/index.do"
+START_URL = "https://ajou.ac.kr/kr/ajou/notice.do"
+# START_KEY = "admisson"
 
 # Chrome Headless 모드 옵션
 CHROME_HEADLESS_OPTIONS = [
-    '--headless',
-    'disable-gpu',
-    'lang=ko_KR',
-    "user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36"
+    "--headless",
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--window-size=1920,1080",
 ]
 
 # 페이지 로딩 및 이벤트 실행 후 대기 시간 (초)
@@ -24,11 +27,14 @@ PAGE_LOAD_DELAY = 0.1
 FILE_EXTENSIONS = ['.pdf', '.zip', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg']
 
 # 다운로드 파일 저장 폴더
-FILES_DIR = "./files"
+# FILES_DIR = "./files"
+FILES_DIR = "/Volumes/Croffle/dev/Amate_TEMP"
 
 # JSON 파일 경로
-FILELIST_JSON = "filelist.json"
-VISIT_JSON = "visit.json"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FILELIST_JSON = os.path.join(BASE_DIR, "data", "filelist.json")
+VISIT_JSON = os.path.join(BASE_DIR, "data", "visit.json")
+CAT_MAPPING_JSON = os.path.join(BASE_DIR, "data", "cat_mapping.json")
 
 load_dotenv()
 
