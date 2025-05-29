@@ -18,12 +18,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 최신 ChromeDriver 설치
-RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d'.' -f1) \
-    && wget -q "https://storage.googleapis.com/chrome-for-testing-public/$CHROME_VERSION.0.6099.109/linux64/chromedriver-linux64.zip" \
-    && unzip chromedriver-linux64.zip \
-    && mv chromedriver-linux64/chromedriver /usr/local/bin/ \
-    && rm -rf chromedriver-linux64.zip chromedriver-linux64 \
-    && chmod +x /usr/local/bin/chromedriver
+RUN CHROME_VERSION=137.0.7151.55 && \
+    wget -q "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROME_VERSION}/linux64/chromedriver-linux64.zip" && \
+    unzip chromedriver-linux64.zip && \
+    mv chromedriver-linux64/chromedriver /usr/local/bin/ && \
+    chmod +x /usr/local/bin/chromedriver && \
+    rm -rf chromedriver-linux64*
 
 # Python 패키지 설치를 위한 requirements.txt 복사
 COPY requirements.txt .
