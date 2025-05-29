@@ -5,23 +5,25 @@ import os
 from dotenv import load_dotenv
 import time
 from redis.exceptions import ConnectionError, RedisError
+from utils.config import REDIS_CONFIG
 
 load_dotenv()
 
 class RedisQueueManager:
     def __init__(self, max_retries=3, retry_delay=1):
-        self.max_retries = max_retries
-        self.retry_delay = retry_delay
         self.redis_client = redis.Redis(
-            host=os.getenv('REDIS_HOST', 'localhost'),
-            port=int(os.getenv('REDIS_PORT', 6379)),
-            db=int(os.getenv('REDIS_DB', 0)),
+            host=REDIS_CONFIG["host"],
+            port=REDIS_CONFIG["port"],
+            password=REDIS_CONFIG["password"],
+            db=REDIS_CONFIG["db"],
             decode_responses=True
         )
-        self.queue_key = "url_queue"
-        self.processing_key = "processing_urls"
-        self.visited_key = "visited_urls"
-        self.temp_file = "redis_state_temp.json"
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+        self.queue_key_prefix = "url_queue:"  # 큐 키 접두사
+        self.processing_key_prefix = "processing_urls:"  # 처리 중인 URL 키 접두사
+        self.visited_key_prefix = "visited_urls:"  # 방문한 URL 키 접두사
+        self.temp_file = "temp_state"
         self.load_lock_key = "redis_load_lock"
         self.load_lock_timeout = 60 # 초 단위 락 타임아웃
         self._connect()
@@ -54,56 +56,68 @@ class RedisQueueManager:
                 time.sleep(self.retry_delay)
                 self._connect()  # 재연결 시도
 
-    def push(self, item: Dict[str, Any]) -> None:
-        """큐에 새로운 항목을 추가합니다."""
+    def _get_queue_key(self, key: str) -> str:
+        """키에 해당하는 큐 키를 반환합니다."""
+        return f"{self.queue_key_prefix}{key}"
+
+    def _get_processing_key(self, key: str) -> str:
+        """키에 해당하는 처리 중인 URL 키를 반환합니다."""
+        return f"{self.processing_key_prefix}{key}"
+
+    def _get_visited_key(self, key: str) -> str:
+        """키에 해당하는 방문한 URL 키를 반환합니다."""
+        return f"{self.visited_key_prefix}{key}"
+
+    def push(self, item: Dict[str, Any], key: str) -> None:
+        """특정 키의 큐에 새로운 항목을 추가합니다."""
         def _push():
-            self.redis_client.rpush(self.queue_key, json.dumps(item))
+            self.redis_client.rpush(self._get_queue_key(key), json.dumps(item))
         self._execute_with_retry(_push)
 
-    def pop(self) -> Optional[Dict[str, Any]]:
-        """큐에서 항목을 가져옵니다."""
+    def pop(self, key: str) -> Optional[Dict[str, Any]]:
+        """특정 키의 큐에서 항목을 가져옵니다."""
         def _pop():
-            item = self.redis_client.lpop(self.queue_key)
+            item = self.redis_client.lpop(self._get_queue_key(key))
             return json.loads(item) if item else None
         return self._execute_with_retry(_pop)
 
-    def mark_as_processing(self, url: str) -> None:
-        """URL을 처리 중인 상태로 표시합니다."""
+    def mark_as_processing(self, url: str, key: str) -> None:
+        """URL을 특정 키의 처리 중인 상태로 표시합니다."""
         def _mark():
-            self.redis_client.sadd(self.processing_key, url)
+            self.redis_client.sadd(self._get_processing_key(key), url)
         self._execute_with_retry(_mark)
 
-    def mark_as_visited(self, url: str) -> None:
-        """URL을 방문 완료 상태로 표시합니다."""
+    def mark_as_visited(self, url: str, key: str) -> None:
+        """URL을 특정 키의 방문 완료 상태로 표시합니다."""
         def _mark():
-            self.redis_client.sadd(self.visited_key, url)
-            self.redis_client.srem(self.processing_key, url)
+            self.redis_client.sadd(self._get_visited_key(key), url)
+            self.redis_client.srem(self._get_processing_key(key), url)
         self._execute_with_retry(_mark)
 
-    def is_visited(self, url: str) -> bool:
-        """URL이 이미 방문되었는지 확인합니다."""
+    def is_visited(self, url: str, key: str) -> bool:
+        """URL이 특정 키에서 이미 방문되었는지 확인합니다."""
         def _check():
-            return self.redis_client.sismember(self.visited_key, url)
+            return self.redis_client.sismember(self._get_visited_key(key), url)
         return self._execute_with_retry(_check)
 
-    def is_processing(self, url: str) -> bool:
-        """URL이 현재 처리 중인지 확인합니다."""
+    def is_processing(self, url: str, key: str) -> bool:
+        """URL이 특정 키에서 현재 처리 중인지 확인합니다."""
         def _check():
-            return self.redis_client.sismember(self.processing_key, url)
+            return self.redis_client.sismember(self._get_processing_key(key), url)
         return self._execute_with_retry(_check)
 
-    def get_queue_length(self) -> int:
-        """현재 큐의 길이를 반환합니다."""
+    def get_queue_length(self, key: str) -> int:
+        """특정 키의 현재 큐 길이를 반환합니다."""
         def _get_length():
-            return self.redis_client.llen(self.queue_key)
+            return self.redis_client.llen(self._get_queue_key(key))
         return self._execute_with_retry(_get_length)
 
-    def clear(self) -> None:
-        """모든 큐 데이터를 초기화합니다."""
+    def clear(self, key: str) -> None:
+        """특정 키의 모든 큐 데이터를 초기화합니다."""
         def _clear():
-            self.redis_client.delete(self.queue_key)
-            self.redis_client.delete(self.processing_key)
-            self.redis_client.delete(self.visited_key)
+            self.redis_client.delete(self._get_queue_key(key))
+            self.redis_client.delete(self._get_processing_key(key))
+            self.redis_client.delete(self._get_visited_key(key))
         self._execute_with_retry(_clear)
 
     def clear_all(self):
@@ -115,61 +129,62 @@ class RedisQueueManager:
             print(f"Redis 초기화 중 오류 발생: {e}")
             raise
 
-    def save_state_to_temp(self) -> None:
-        """현재 Redis 상태를 임시 파일로 저장합니다."""
+    def save_state_to_temp(self, key: str) -> None:
+        """특정 키의 현재 Redis 상태를 임시 파일로 저장합니다."""
         try:
             state = {
-                "queue": [json.loads(item) for item in self.redis_client.lrange(self.queue_key, 0, -1)],
-                "processing": list(self.redis_client.smembers(self.processing_key)),
-                "visited": list(self.redis_client.smembers(self.visited_key))
+                "queue": [json.loads(item) for item in self.redis_client.lrange(self._get_queue_key(key), 0, -1)],
+                "processing": list(self.redis_client.smembers(self._get_processing_key(key))),
+                "visited": list(self.redis_client.smembers(self._get_visited_key(key)))
             }
-            with open(self.temp_file, 'w', encoding='utf-8') as f:
+            with open(f"{self.temp_file}.{key}", 'w', encoding='utf-8') as f:
                 json.dump(state, f, ensure_ascii=False, indent=2)
-            print(f"Redis 상태가 {self.temp_file}에 저장되었습니다.")
+            print(f"Redis 상태가 {self.temp_file}.{key}에 저장되었습니다.")
         except Exception as e:
             print(f"Redis 상태 저장 중 오류 발생: {e}")
 
-    def load_state_from_temp(self) -> bool:
-        """임시 파일에서 Redis 상태를 불러옵니다."""
-        if not os.path.exists(self.temp_file):
-            print(f"임시 파일 {self.temp_file}가 존재하지 않습니다.")
+    def load_state_from_temp(self, key: str) -> bool:
+        """특정 키의 임시 파일에서 Redis 상태를 불러옵니다."""
+        temp_file = f"{self.temp_file}.{key}"
+        if not os.path.exists(temp_file):
+            print(f"임시 파일 {temp_file}가 존재하지 않습니다.")
             return False
 
         try:
-            with open(self.temp_file, 'r', encoding='utf-8') as f:
+            with open(temp_file, 'r', encoding='utf-8') as f:
                 state = json.load(f)
 
-            # 기존 데이터 초기화 (복원 전에 현재 Redis 상태를 비움)
-            self.clear()
+            # 기존 데이터 초기화
+            self.clear(key)
 
             # 큐 데이터 복원
             if state.get("queue"):
-                 self.redis_client.rpush(self.queue_key, *[json.dumps(item) for item in state["queue"]])
+                self.redis_client.rpush(self._get_queue_key(key), *[json.dumps(item) for item in state["queue"]])
 
             # 처리 중인 URL 복원
             if state.get("processing"):
-                 self.redis_client.sadd(self.processing_key, *state["processing"])
+                self.redis_client.sadd(self._get_processing_key(key), *state["processing"])
 
             # 방문한 URL 복원
             if state.get("visited"):
-                 self.redis_client.sadd(self.visited_key, *state["visited"])
+                self.redis_client.sadd(self._get_visited_key(key), *state["visited"])
 
-            print(f"Redis 상태가 {self.temp_file}에서 복원되었습니다.")
+            print(f"Redis 상태가 {temp_file}에서 복원되었습니다.")
             return True
         except Exception as e:
             print(f"Redis 상태 복원 중 오류 발생: {e}")
             return False
 
-    def is_redis_empty(self) -> bool:
-        """Redis 큐, 처리 중, 방문 완료 상태가 모두 비어있는지 확인합니다."""
+    def is_redis_empty(self, key: str) -> bool:
+        """특정 키의 Redis 큐, 처리 중, 방문 완료 상태가 모두 비어있는지 확인합니다."""
         try:
-            queue_len = self.redis_client.llen(self.queue_key)
-            processing_count = self.redis_client.scard(self.processing_key)
-            visited_count = self.redis_client.scard(self.visited_key)
+            queue_len = self.redis_client.llen(self._get_queue_key(key))
+            processing_count = self.redis_client.scard(self._get_processing_key(key))
+            visited_count = self.redis_client.scard(self._get_visited_key(key))
             return queue_len == 0 and processing_count == 0 and visited_count == 0
         except Exception as e:
             print(f"Redis 상태 확인 중 오류 발생: {e}")
-            return False # 오류 발생 시 비어있지 않다고 가정하여 데이터 손실 방지
+            return False
 
     def acquire_load_lock(self) -> bool:
         """상태 복원을 위한 Redis 락을 획득합니다."""

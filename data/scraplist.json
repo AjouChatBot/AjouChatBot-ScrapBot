@@ -1,0 +1,62 @@
+{
+  "introduction": [
+    "https://ajou.ac.kr/kr/intro/idea.do"
+  ],
+  "research": [
+    "https://ajou.ac.kr/kr/research"
+  ],
+  "schedule": [], 
+  "Academic_Information": [
+    "https://ajou.ac.kr/kr/admission",
+    "https://www.ajou.ac.kr/eng/index.do",
+    "https://www.ajou.ac.kr/it/index.do",
+    "https://www.ajou.ac.kr/sw/index.do",
+    "https://www.ajou.ac.kr/ns/index.do",
+    "https://www.ajou.ac.kr/biz/index.do",
+    "https://www.ajou.ac.kr/human/index.do",
+    "https://www.ajou.ac.kr/coss/index.do",
+    "https://ibio.ajou.ac.kr/ibioindex.do",
+    "https://uc.ajou.ac.kr/uc/index.do",
+    "https://isa.ajou.ac.kr/isa/index.do",
+    "https://www.ajou.ac.kr/pharm/index.do"
+  ],
+  "Course": [
+
+  ],
+  "Tuition": [
+
+  ],
+  "Scholarships": [
+    "https://ajou.ac.kr/kr/bachelor/tuition.do",
+    "https://ajou.ac.kr/kr/bachelor/select.do",
+    "https://ajou.ac.kr/kr/bachelor/scholarship-school01.do",
+    "https://ajou.ac.kr/kr/bachelor/scholarship-outside01.do",
+    "https://ajou.ac.kr/kr/bachelor/finance.do",
+    "https://ajou.ac.kr/kr/ajou/notice_scholarship.do"
+  ],
+  "Faculties": [
+    "https://www.ajou.ac.kr/researcher"
+  ],
+  "Facilities": [
+    "https://ajou.ac.kr/kr/life",
+    "https://ajou.ac.kr/kr/life/sports.do",
+    "https://ajou.ac.kr/dorm"
+  ],
+  "Services": [
+
+  ],
+  "Student_Association": [
+    "https://www.ajou.ac.kr/kr/life/ajouclub.do",
+    "https://www.ajou.ac.kr/kr/life/club_list.do",
+    "https://www.ajou.ac.kr/kr/life/club_faq.do",
+    "https://www.ajou.ac.kr/kr/guide/club-*",
+    "https://ajou.ac.kr/kr/life/council.do",
+    "https://ajouglobe1989.wixsite.com/press",
+    "https://press.ajou.ac.kr/"
+  ],
+  "Notices": [
+    "https://ajou.ac.kr/kr/ajou/notice.do",
+    "https://ajou.ac.kr/kr/ajou/notice_scholarship.do"
+  ],
+  "Admissions": []
+}

@@ -14,7 +14,7 @@ from selenium.common.exceptions import (
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-from utils.config import PAGE_LOAD_DELAY, VISIT_JSON, FILES_DIR, FILELIST_JSON
+from utils.config import PAGE_LOAD_DELAY, VISIT_JSON, FILES_DIR, FILELIST_JSON, START_KEY
 from utils.file_manager import save_json, save_content, load_json
 from utils.db_manager import save_log
 from utils.url_manager import adjust_url
@@ -67,12 +67,12 @@ def process_image(url: str, parent_url: str, queue_manager: RedisQueueManager) -
     이미지 URL을 다운로드하고 파일 및 DB에 저장합니다.
     성공 시 content_id를 반환합니다.
     """
-    if queue_manager.is_visited(url) or queue_manager.is_processing(url):
+    if queue_manager.is_visited(url, START_KEY) or queue_manager.is_processing(url, START_KEY):
         print(f"ㄴ이미 처리 중이거나 방문한 이미지: {url}")
         return None
 
     print(f"ㄴ이미지 처리 시작: {url}")
-    queue_manager.mark_as_processing(url)
+    queue_manager.mark_as_processing(url, START_KEY)
 
     try:
         r = requests.get(url, stream=True, timeout=10)
@@ -130,7 +130,7 @@ def process_image(url: str, parent_url: str, queue_manager: RedisQueueManager) -
 
         print(f"ㄴ이미지 다운로드 및 저장 완료: {filepath} (출처: {url})")
 
-        queue_manager.mark_as_visited(url) # 방문 상태로 표시
+        queue_manager.mark_as_visited(url, START_KEY) # 방문 상태로 표시
         return content_id
 
     except requests.exceptions.RequestException as e:
@@ -138,7 +138,7 @@ def process_image(url: str, parent_url: str, queue_manager: RedisQueueManager) -
     except Exception as e:
         print(f"ㄴ이미지 처리 중 오류 발생 (URL: {url}): {e}")
     finally:
-        queue_manager.mark_as_visited(url) # 실패하더라도 재처리 방지
+        queue_manager.mark_as_visited(url, START_KEY) # 실패하더라도 재처리 방지
 
     return None
 
@@ -163,7 +163,7 @@ def process_page(driver, url: str, queue_manager: RedisQueueManager) -> None:
             time.sleep(PAGE_LOAD_DELAY)
 
             # 최초접속인 경우에만 데이터 저장
-            if not queue_manager.is_visited(url):
+            if not queue_manager.is_visited(url, START_KEY):
                 print(f"ㄴ페이지 정보 저장: {url}")
 
                 # 페이지 내 정보저장
@@ -179,6 +179,11 @@ def process_page(driver, url: str, queue_manager: RedisQueueManager) -> None:
 
                 data = content_area.get_attribute("outerHTML")
                 title = driver.title
+                
+                # 통합인증 페이지인 경우 처리 중단
+                if '통합인증' in title:
+                    print(f"ㄴ통합인증 페이지 감지, 처리 중단: {url}")
+                    return
                 
                 dates_list = CREATED_BY_FIND_REGEX.findall(data)
                 created_at = dates_list[0][0] if dates_list else datetime.now().strftime("%Y-%m-%d")
@@ -224,12 +229,12 @@ def process_links(driver, parent_url: str, queue_manager: RedisQueueManager) -> 
             href = a.get_attribute("href")
             if href:
                 href = adjust_url(href)
-                if is_in_search_scope(href) and not queue_manager.is_visited(href):
+                if is_in_search_scope(href) and not queue_manager.is_visited(href, START_KEY):
                     queue_manager.push({
                         "type": "link",
                         "url": href,
                         "parent": parent_url
-                    })
+                    }, START_KEY)
     except Exception as e:
         print(f"링크 처리 중 오류 발생: {e}")
 
@@ -245,14 +250,14 @@ def process_onclick_events(driver, parent_url: str, queue_manager: RedisQueueMan
 
             if onclick:
                 onclick = adjust_url(onclick)
-                if is_in_search_scope(onclick) and not queue_manager.is_visited(onclick):
+                if is_in_search_scope(onclick) and not queue_manager.is_visited(onclick, START_KEY):
                     queue_manager.push({
                         "type": "event",
                         "url": onclick,
                         "onClick": onclick,
                         "identifier": identifier,
                         "parent": parent_url
-                    })
+                    }, START_KEY)
     except Exception as e:
         print(f"onClick 이벤트 처리 중 오류 발생: {e}")
 
